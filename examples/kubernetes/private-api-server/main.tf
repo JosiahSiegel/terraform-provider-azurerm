@@ -7,6 +7,27 @@ resource "azurerm_resource_group" "example" {
   location = var.location
 }
 
+resource "azurerm_log_analytics_workspace" "example" {
+  name                = "${var.prefix}-law"
+  location            = azurerm_resource_group.example.location
+  resource_group_name = azurerm_resource_group.example.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+resource "azurerm_log_analytics_solution" "example" {
+  solution_name         = "ContainerInsights"
+  location              = azurerm_resource_group.example.location
+  resource_group_name   = azurerm_resource_group.example.name
+  workspace_resource_id = azurerm_log_analytics_workspace.example.id
+  workspace_name        = azurerm_log_analytics_workspace.example.name
+
+  plan {
+    publisher = "Microsoft"
+    product   = "OMSGallery/ContainerInsights"
+  }
+}
+
 resource "azurerm_kubernetes_cluster" "example" {
   name                = "${var.prefix}-k8s"
   location            = azurerm_resource_group.example.location
@@ -30,6 +51,17 @@ resource "azurerm_kubernetes_cluster" "example" {
 
   private_cluster_enabled = true
 
+  auto_scaler_profile {
+  }
+
+  role_based_access_control {
+    enabled = true
+    azure_active_directory {
+      managed = true
+      azure_rbac_enabled = true
+    }
+  }
+
   addon_profile {
     aci_connector_linux {
       enabled = false
@@ -44,7 +76,8 @@ resource "azurerm_kubernetes_cluster" "example" {
     }
 
     oms_agent {
-      enabled = false
+      enabled = true
+      log_analytics_workspace_id = azurerm_log_analytics_workspace.example.id
     }
   }
 }
